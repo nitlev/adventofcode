@@ -1,6 +1,5 @@
 function parseinput(filename)
-    content = open(f->split(read(f, String), "\n"), filename, "r")
-    [parse(Int, x) for x in content]
+    [parse(Int, x) for x in eachline(filename)]
 end
 
 function rollingwindows(depths, size=1)
@@ -20,18 +19,8 @@ function rollingsum(depths, size=1)
     [sum(window) for window in windows]
 end
 
-function isdeeper(depth1, depth2):Bool
-    depth1 > depth2
-end
-
 function countincreases(depths::Array{Int})
-    n = 0
-    for i in 1:(length(depths) - 1)
-        if isdeeper(depths[i+1], depths[i])
-            n += 1
-        end
-    end
-    n
+    sum(next > current for (next, current) in zip(depths[2:end], depths))
 end
 
 function main()
@@ -41,7 +30,7 @@ function main()
 end
 
 function main2()
-    depths = parseinput("test.txt")
+    depths = parseinput("input.txt")
     rollingsums = rollingsum(depths, 3)
     result = countincreases(rollingsums)
     println(result)
