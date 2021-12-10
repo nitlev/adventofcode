@@ -16,7 +16,7 @@
             x1 (get p (get p (+ i 1)))
             x2 (get p (get p (+ i 2)))]
         (recur (+ i 4)
-               (update p address (fn [old] (op x1 x2))))))))
+               (update p address (fn [_] (op x1 x2))))))))
 
 (defn restore [program value1 value2]
   (let [p (vec program)
