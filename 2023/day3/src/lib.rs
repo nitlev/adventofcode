@@ -111,8 +111,46 @@ fn parse_input(input: &str) -> Vec<ParsedNumber> {
     numbers
 }
 
-pub fn star1(input: String) -> u32 {
-    let parsed_numbers = parse_input(&input);
+pub fn star1(input: &str) -> u32 {
+    let parsed_numbers = parse_input(input);
     let parts: Vec<&ParsedNumber> = parsed_numbers.iter().filter(|n| n.is_part(input.lines())).collect();
     parts.iter().map(|p| p.value).sum()
+}
+
+
+struct Gear {
+    line: usize,
+    position: usize,
+}
+
+fn find_gears(input: &str) -> Vec<Gear> {
+    let mut gears = Vec::new();
+    for (i, line) in input.lines().enumerate() {
+        for (j, _) in line.match_indices('*') {
+            gears.push(Gear{line:i, position:j})
+        }
+    }
+    gears
+}
+
+fn find_gear_ratio(gear: &Gear, numbers: &Vec<ParsedNumber>) -> Option<u32> {
+    let mut values = Vec::new();
+    for number in numbers {
+        if number.line >= if gear.line == 0 {gear.line} else {gear.line - 1}
+        && number.line <= gear.line + 1
+        && number.start <= gear.position + 1
+        && number.end >= if gear.position == 0 {gear.position} else {gear.position - 1} {
+            values.push(number.value)
+        }
+    }
+    if values.len() == 2 {
+        Some(values[0] * values[1])
+    } else { None }
+}
+
+
+pub fn star2(input: &str) -> u32 {
+    let numbers = parse_input(input);
+    let gears = find_gears(input);
+    gears.iter().flat_map(|g| find_gear_ratio(g, &numbers)).sum()
 }
