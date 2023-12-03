@@ -8,4 +8,9 @@ edition = "2021"
 name = "star1"
 path = "src/star1.rs"
 
+[[bin]]
+name = "star2"
+path = "src/star2.rs"
+
+
 [dependencies]
