@@ -4,13 +4,14 @@ fn main() {
     let filepath = env::args().nth(1).expect("Expects an argument");
     let content = fs::read_to_string(filepath).expect("Couldn't read file");
 
-    let star1_answer = star1(&content);
-    println!("{star1_answer}");
+    let star2_answer = star2(&content);
+    println!("{star2_answer}");
 }
 
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 enum Card {
+    Joker,
     Two,
     Three,
     Four,
@@ -20,7 +21,6 @@ enum Card {
     Eight,
     Nine,
     Ten,
-    Jack,
     Queen,
     King,
     Ace,
@@ -32,7 +32,7 @@ impl Card {
             'A' => Some(Card::Ace),
             'K' => Some(Card::King),
             'Q' => Some(Card::Queen),
-            'J' => Some(Card::Jack),
+            'J' => Some(Card::Joker),
             'T' => Some(Card::Ten),
             '9' => Some(Card::Nine),
             '8' => Some(Card::Eight),
@@ -105,13 +105,15 @@ impl Hand {
         for card in &self.cards {
             *card_counts.entry(card).or_default() += 1
         }
+        let joker_count = card_counts.remove_entry(&Card::Joker).unwrap_or((&Card::Joker, 0)).1;
         let mut sorted_counts: Vec<u32> = card_counts.values().cloned().collect();
         sorted_counts.sort();
         sorted_counts.reverse();
 
-        let first_count = sorted_counts.first().unwrap();
+        let first_count = sorted_counts.first().unwrap_or(&0) + joker_count;
         let second_count = sorted_counts.get(1).unwrap_or(&0);
         match (first_count, second_count) {
+            (0, _) => HandType::FiveOfAKind,
             (5, _) => HandType::FiveOfAKind,
             (4, _) => HandType::FourOfAKind,
             (3, 2) => HandType::FullHouse,
@@ -123,7 +125,7 @@ impl Hand {
     }
 }
 
-fn star1(input: &str) -> u32 {
+fn star2(input: &str) -> u32 {
     let mut hands: Vec<Hand> = input.lines().map(Hand::from_string).collect();
     hands.sort();
 
