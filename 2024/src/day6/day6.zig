@@ -102,8 +102,7 @@ fn read(allocator: Allocator, path: []const u8) ![]u8 {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
 
-    const result = try file.readToEndAlloc(allocator, 1014 * 1024);
-    return result;
+    return file.readToEndAlloc(allocator, 1014 * 1024);
 }
 
 test "Star 1" {
