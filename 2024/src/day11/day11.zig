@@ -1,14 +1,24 @@
 const std = @import("std");
 const testing = std.testing;
-const List = std.DoublyLinkedList(u64);
-const Node = List.Node;
+const AutoHashMap = std.AutoHashMap;
 const Allocator = std.mem.Allocator;
 
 pub fn main() !void {
     std.debug.print("Star 1: {d}\n", .{try star1("src/day11/input.txt")});
+    std.debug.print("Star 2: {d}\n", .{try star2("src/day11/input.txt")});
 }
 
+const StoneMap = AutoHashMap(u64, usize);
+
 fn star1(path: []const u8) !usize {
+    return try star(path, 25);
+}
+
+fn star2(path: []const u8) !usize {
+    return try star(path, 75);
+}
+
+fn star(path: []const u8, n_iter: usize) !usize {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
@@ -19,58 +29,61 @@ fn star1(path: []const u8) !usize {
     const content = try file.readToEndAlloc(allocator, 1024);
     defer allocator.free(content);
 
-    var stones = List{};
-    try parse(allocator, &stones, content);
-    defer {
-        while (stones.pop()) |node| {
-            allocator.destroy(node);
-        }
-    }
+    var current_stones = StoneMap.init(allocator);
+    defer current_stones.deinit();
+    var new_stones = StoneMap.init(allocator);
+    defer new_stones.deinit();
 
-    for (0..75) |i| {
+    try parse(&current_stones, content);
+
+    for (0..n_iter) |i| {
+        try update(&current_stones, &new_stones);
+        // Swap maps
+        const stones = current_stones;
+        current_stones = new_stones;
+        new_stones = stones;
+        new_stones.clearRetainingCapacity();
+
         std.debug.print("{d}\n", .{i});
-        try update(allocator, &stones);
     }
 
-    return stones.len;
+    return countStones(&current_stones);
 }
 
-fn parse(allocator: Allocator, stones: *List, content: []const u8) !void {
+fn parse(stones: *StoneMap, content: []const u8) !void {
     var tokens = std.mem.tokenizeAny(u8, content, " \n");
     while (tokens.next()) |token| {
         const stone = try std.fmt.parseInt(u64, token, 10);
-        var node = try allocator.create(Node);
-        node.data = stone;
-        stones.append(node);
+        const current_value = stones.get(stone) orelse 0;
+        try stones.put(stone, current_value + 1);
     }
 }
 
-fn update(allocator: Allocator, stones: *List) !void {
-    var it = stones.first;
-    while (it) |node| : (it = node.next) {
-        try updateNode(allocator, stones, node);
+fn update(current_stones: *StoneMap, new_stones: *StoneMap) !void {
+    var it = current_stones.iterator();
+    while (it.next()) |entry| {
+        const stone = entry.key_ptr.*;
+        const count = entry.value_ptr.*;
+        if (stone == 0) {
+            try updateStone(new_stones, 1, count);
+            continue;
+        }
+
+        const n = digitCount(stone);
+        if (n % 2 == 0) {
+            const s = split(stone, n / 2);
+            try updateStone(new_stones, s.left, count);
+            try updateStone(new_stones, s.right, count);
+            continue;
+        }
+
+        try updateStone(new_stones, stone * 2024, count);
     }
 }
 
-fn updateNode(allocator: Allocator, stones: *List, node: *Node) !void {
-    if (node.data == 0) {
-        node.data = 1;
-        return;
-    }
-
-    const n = digitCount(node.data);
-    if (n % 2 == 0) {
-        const s = split(node.data, n / 2);
-
-        const new_node = try allocator.create(Node);
-        new_node.data = s.left;
-        stones.insertBefore(node, new_node);
-
-        node.data = s.right;
-        return;
-    }
-
-    node.data *= 2024;
+fn updateStone(stones: *StoneMap, stone: u64, count: usize) !void {
+    const c = stones.get(stone) orelse 0;
+    try stones.put(stone, c + count);
 }
 
 fn digitCount(number: u64) u64 {
@@ -95,6 +108,15 @@ fn split(number: u64, index: u64) Split {
     return .{ .left = left, .right = right };
 }
 
+fn countStones(stones: *const StoneMap) usize {
+    var total: usize = 0;
+    var it = stones.iterator();
+    while (it.next()) |entry| {
+        total += entry.value_ptr.*;
+    }
+    return total;
+}
+
 const Split = struct {
     left: u64,
     right: u64,
@@ -114,31 +136,6 @@ test "split" {
     try testing.expectEqual(34, s.right);
 }
 
-test "update" {
-    var allocator = std.testing.allocator;
-    var stones = List{};
-    defer {
-        while (stones.pop()) |node| {
-            allocator.destroy(node);
-        }
-    }
-
-    const in = [_]u64{ 0, 1, 10, 99, 999 };
-    for (in) |i| {
-        var node = try allocator.create(Node);
-        node.data = i;
-        stones.append(node);
-    }
-
-    try update(allocator, &stones);
-
-    const expected = [_]u64{ 1, 2024, 1, 0, 9, 9, 2021976 };
-    var node = stones.first;
-    var i: usize = 0;
-    while (node) |n| : ({
-        node = n.next;
-    }) {
-        try testing.expectEqual(expected[i], n.data);
-        i += 1;
-    }
+test "star1" {
+    try testing.expectEqual(55312, try star1("src/day11/test.txt"));
 }
