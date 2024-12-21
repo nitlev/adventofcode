@@ -19,9 +19,9 @@ fn star2(path: []const u8) !usize {
 }
 
 fn star(path: []const u8, n_iter: usize) !usize {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer std.debug.assert(gpa.deinit() == .ok);
-    const allocator = gpa.allocator();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
@@ -31,17 +31,18 @@ fn star(path: []const u8, n_iter: usize) !usize {
 
     var current_stones = StoneMap.init(allocator);
     defer current_stones.deinit();
+    try current_stones.ensureTotalCapacity(10000);
+
     var new_stones = StoneMap.init(allocator);
     defer new_stones.deinit();
+    try new_stones.ensureTotalCapacity(10000);
 
     try parse(&current_stones, content);
 
     for (0..n_iter) |i| {
         try update(&current_stones, &new_stones);
         // Swap maps
-        const stones = current_stones;
-        current_stones = new_stones;
-        new_stones = stones;
+        std.mem.swap(StoneMap, &current_stones, &new_stones);
         new_stones.clearRetainingCapacity();
 
         std.debug.print("{d}\n", .{i});
@@ -71,9 +72,9 @@ fn update(current_stones: *StoneMap, new_stones: *StoneMap) !void {
 
         const n = digitCount(stone);
         if (n % 2 == 0) {
-            const s = split(stone, n / 2);
-            try updateStone(new_stones, s.left, count);
-            try updateStone(new_stones, s.right, count);
+            const pow = std.math.pow(u64, 10, n / 2);
+            try updateStone(new_stones, stone / pow, count);
+            try updateStone(new_stones, stone % pow, count);
             continue;
         }
 
@@ -82,8 +83,9 @@ fn update(current_stones: *StoneMap, new_stones: *StoneMap) !void {
 }
 
 fn updateStone(stones: *StoneMap, stone: u64, count: usize) !void {
-    const c = stones.get(stone) orelse 0;
-    try stones.put(stone, c + count);
+    const c = stones.getOrPutAssumeCapacity(stone);
+    if (!c.found_existing) c.value_ptr.* = 0;
+    c.value_ptr.* += count;
 }
 
 fn digitCount(number: u64) u64 {
@@ -94,18 +96,6 @@ fn digitCount(number: u64) u64 {
         n /= 10;
     }
     return count;
-}
-
-fn split(number: u64, index: u64) Split {
-    var left: u64 = number;
-    var right: u64 = 0;
-    var i: u64 = 0;
-    while (left != 0 and i < index) {
-        right = (left % 10) * std.math.pow(u64, 10, i) + right;
-        left /= 10;
-        i += 1;
-    }
-    return .{ .left = left, .right = right };
 }
 
 fn countStones(stones: *const StoneMap) usize {
@@ -128,12 +118,6 @@ test "digitCount" {
     try testing.expectEqual(2, digitCount(10));
     try testing.expectEqual(3, digitCount(123));
     try testing.expectEqual(4, digitCount(1234));
-}
-
-test "split" {
-    const s = split(1234, 2);
-    try testing.expectEqual(12, s.left);
-    try testing.expectEqual(34, s.right);
 }
 
 test "star1" {
